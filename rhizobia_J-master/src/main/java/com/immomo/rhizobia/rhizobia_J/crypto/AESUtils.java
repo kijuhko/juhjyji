@@ -1,0 +1,128 @@
+/**
+ * MOMOSEC Security SDK(MSS)
+ *
+ * This file is part of the Open MSS Project
+ *
+ * Copyright (c) 2019 - V0ld1ron
+ *
+ * The MSS is published by V0ld1ron under the BSD license. You should read and accept the
+ * LICENSE before you use, modify, and/or redistribute this software.
+ *
+ * @author V0ld1ron (projectone .at. immomo.com)
+ * @created 2019
+ */
+
+package com.immomo.rhizobia.rhizobia_J.crypto;
+
+import org.apache.commons.codec.digest.DigestUtils;
+import javax.crypto.Cipher;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+
+
+/**
+ * @program: java安全编码实践
+ *
+ * @description: AES 加解密方法
+ *
+ * 知识点1：oracle官方已经在如下版本去除了aes-256的限制，6u181，7u171，8u161，9 b148，openjdk7u
+ *             https://bugs.java.com/bugdatabase/view_bug.do?bug_id=JDK-8170157
+ *
+ * 知识点2：之所以没有用base64或16进制处理加密后的内容，是因为在使用base64编码后的内容中，可能存在'+'字符，
+ *             '+'字符返回给前端后再返回给后端时，如果不经过处理，会变为' '空格字符，
+ *             所以在对加密内容进行base64编码时，请注意'+'字符
+ *
+ * @author: V0ld1ron
+ *
+ **/
+
+public class AESUtils {
+    private static AESUtils instance = null;
+    private String aesKey = "";
+    private String secretKey = "";
+
+    private String iVector = "";
+    private String aesMode = "AES/CBC/PKCS5Padding";
+
+    private AESUtils() {
+
+    }
+
+    private AESUtils(String aesKey, String secretKey, String aesMode) {
+        this.secretKey = secretKey;
+        this.aesKey = DigestUtils.md5Hex(DigestUtils.sha256Hex(aesKey + "|" + secretKey) + "|" + secretKey);
+        this.iVector = this.aesKey.substring(8, 24);
+        this.aesMode = aesMode == null ? "AES/CBC/PKCS5Padding" : aesMode;
+    }
+
+    public static AESUtils getInstance(String aesKey, String secretKey, String aesMode) {
+        if (instance == null) {
+            synchronized (AESUtils.class) {
+                if (null == instance) {
+                    instance = new AESUtils(aesKey, secretKey, aesMode);
+                }
+            }
+        } else {
+            instance.secretKey = secretKey;
+            instance.aesKey = DigestUtils.md5Hex(DigestUtils.sha256Hex(aesKey + "|" + secretKey) + "|" + secretKey);
+            instance.iVector = instance.aesKey.substring(8, 24);
+            instance.aesMode = aesMode == null ? "AES/CBC/PKCS5Padding" : aesMode;
+        }
+        return instance;
+    }
+
+    public String getaesKey() {
+        return aesKey;
+    }
+
+    public String getsecretKey() {
+        return secretKey;
+    }
+
+    public void setiVector(String iVector) {
+        this.iVector = iVector;
+    }
+
+    public String getaesMode() {
+        return aesMode;
+    }
+
+    public void setaesMode(String aesMode) {
+        this.aesMode = aesMode;
+    }
+
+    /**
+     * @Description: AES 加密
+     * @Param: sSrc 待加密数据
+     * @return: byte[] 加密后byte流
+     */
+    public byte[] encrypt(String sSrc) throws Exception {
+        byte[] raw = aesKey.getBytes();
+        SecretKeySpec skeySpec = new SecretKeySpec(raw, "AES");
+        Cipher cipher = Cipher.getInstance(aesMode);
+        IvParameterSpec iv = new IvParameterSpec(iVector.getBytes());
+        cipher.init(Cipher.ENCRYPT_MODE, skeySpec, iv);
+        byte[] encrypted = cipher.doFinal(sSrc.getBytes());
+
+        return encrypted;
+    }
+
+    /**
+     * @Description: AES 解密
+     * @Param: encrypted 待解密二进制流
+     * @return: String 解密后数据
+     */
+    public String decrypt(byte[] encrypted) throws Exception {
+        String originalString = null;
+        byte[] raw = aesKey.getBytes("ASCII");
+        SecretKeySpec skeySpec = new SecretKeySpec(raw, "AES");
+        Cipher cipher = Cipher.getInstance(aesMode);
+        IvParameterSpec iv = new IvParameterSpec(iVector.getBytes());
+        cipher.init(Cipher.DECRYPT_MODE, skeySpec, iv);
+        byte[] original = cipher.doFinal(encrypted);
+        originalString = new String(original);
+
+        return originalString;
+    }
+
+}
